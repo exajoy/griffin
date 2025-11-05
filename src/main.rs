@@ -1,7 +1,5 @@
 #![feature(impl_trait_in_assoc_type)]
 
-pub mod grpcweb;
-
 use bytes::Bytes;
 use clap::Parser;
 use http_body_util::{BodyExt, Full};
@@ -11,12 +9,17 @@ use hyper::{Request, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::service::TowerToHyperService;
 use tokio::net::{TcpListener, TcpStream};
-use tonic_web::GrpcWebCall;
 use tower::BoxError;
 use tower::ServiceBuilder;
 
 use crate::grpcweb::args::Args;
+use crate::grpcweb::call::GrpcWebCall;
 use crate::grpcweb::grpc_header::*;
+
+pub mod grpcweb;
+pub mod metadata;
+pub mod status;
+pub mod util;
 
 async fn forward(
     req: Request<GrpcWebCall<Full<Bytes>>>,
