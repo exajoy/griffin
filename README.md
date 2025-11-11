@@ -1,9 +1,12 @@
-## Building
+## Installation
+
+## Build from source
 
 ```ssh
 git clone https://github.com/exajoy/rgrpcwebproxy
 cd rgrpcwebproxy
 cargo build --release
+
 ```
 
 ## Run tests
@@ -12,5 +15,3 @@ cargo build --release
 cargo test --feature test
 
 ```
-
-## Installation
