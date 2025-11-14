@@ -38,8 +38,8 @@ scopeguard = "1.2.0"
 # httptest = "0.16.3"
 
 [build-dependencies]
-tonic-build = { version = "0.14.2", optional = true }
-tonic-prost-build = { version = "0.14.2", optional = true }
+tonic-build = { version = "0.14.2" }
+tonic-prost-build = { version = "0.14.2" }
 
 [features]
 test-support = [
@@ -49,6 +49,4 @@ test-support = [
   "tonic",
   "tonic-prost",
   "tonic-web",
-  "tonic-build",
-  "tonic-prost-build",
 ]

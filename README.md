@@ -2,7 +2,7 @@
 
 # Griffin
 
-A lightweight proxy written in rust to handle gRPC-web, translating gRPC-web requests to standard gRPC requests.
+A lightweight proxy built on top of hyper.rs to handle gRPC-web, translating gRPC-web requests to standard gRPC requests.
 
 ```
 grpc-web client <--> griffin (grpc-web to grpc proxy) <--> grpc server
@@ -10,6 +10,16 @@ grpc-web client <--> griffin (grpc-web to grpc proxy) <--> grpc server
 
 ```
 grpc client <--> griffin <--> grpc server
+```
+
+## How to use
+
+```ssh
+griffin \
+--proxy-host=127.0.0.1 \
+--proxy-port=8080 \
+--forward-host=127.0.0.1 \
+--forward-port=3000
 ```
 
 ## Inspirations
@@ -44,11 +54,18 @@ cd griffin
 cargo build --release
 ```
 
+## TODO
+
+- [x] Handle both grpc-web and grpc requests
+- [] Add telemetry and health check
+- [] Add CORS
+- [] Add TLS support
+
 ## Contribution
 
 Please feel free to open issues or submit pull requests.
 
-### Run tests
+### Run tests (init test and integration test)
 
 ```ssh
 cargo test --feature test
