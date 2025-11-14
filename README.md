@@ -84,7 +84,7 @@ cargo build --release
 
 Please feel free to open issues or submit pull requests.
 
-### Run tests (init test and integration test)
+### Run tests (unit tests and integration tests)
 
 ```ssh
 cargo test --feature test

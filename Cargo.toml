@@ -50,3 +50,10 @@ test-support = [
   "tonic-prost",
   "tonic-web",
 ]
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
+panic = "abort"
+strip = true
