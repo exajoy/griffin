@@ -30,6 +30,13 @@ grpc client <--> griffin <--> grpc server
 
 ### Build from source
 
+#### Requirements
+
+rustc 1.91.0
+cargo 1.81.0
+
+#### Commands
+
 ```ssh
 git clone https://github.com/exajoy/griffin
 cd griffin
