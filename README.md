@@ -95,3 +95,9 @@ Please feel free to open issues or submit pull requests.
 ```ssh
 cargo test --feature test
 ```
+
+## FAQs
+
+1. Why this proxy is called Griffin?
+   Griffin is a hybrid mythical creature with the body of a lion and the head and wings of an eagle.
+   This proxy is a hybrid proxy that combines gRPC-web and gRPC functionalities, just like a Griffin.
