@@ -2,11 +2,17 @@
 
 # Griffin - A lightweight gRPC-Web to gRPC proxy
 
-In the world of package transmission, gRPC-Web and gRPC are becoming increasingly polular.
-However, the current solutions of converting gRPRC-Web to gRPC, such as Envoy,
-are often too large and complex for lightweight applications.
+<!-- In the world of package transmission, gRPC-Web and gRPC are becoming increasingly polular. -->
+<!-- However, the current solutions of converting gRPRC-Web to gRPC, such as Envoy, -->
+<!-- are often too large and complex for lightweight applications. -->
 
-Griffin is a lightweight proxy built on top of hyper.rs that translate gRPC-web to standard gRPC requests.
+At my previous company, I encountered an issue where Pods took too long to spin up before they could start handling requests.
+As a result, a queue of incoming requests had to wait until the Pod was fully ready to process them.
+The main cause was our use of Envoy purely for gRPC-web to gRPC translation, which introduced unnecessary overhead.
+
+This motivated me to build Griffin, a lightweight, purpose-built gRPC-web → gRPC proxy to remove that bottleneck and reduce cold-start latency.
+
+Griffin is built on top of hyper.rs that translate gRPC-web to standard gRPC requests.
 Griffin's binary is only [1MB](https://github.com/exajoy/griffin/releases), **100x smaller** than Envoy's binary [(140MB+)](https://hub.docker.com/r/envoyproxy/envoy/tags?name=dev) and **15x smaller**
 than grpcwebproxy [(15.3MB)](https://github.com/improbable-eng/grpc-web/releases) **without garbage collection**.
 
