@@ -6,9 +6,9 @@
 <!-- However, the current solutions of converting gRPRC-Web to gRPC, such as Envoy, -->
 <!-- are often too large and complex for lightweight applications. -->
 
-At my previous company, I encountered an issue where Pods took too long to spin up before they could start handling requests.
-As a result, a queue of incoming requests had to wait until the Pod was fully ready to process them.
-The main cause was our use of Envoy purely for gRPC-web to gRPC translation, which introduced unnecessary overhead.
+In my previous role, Pods experienced slow cold starts, causing requests to queue until the Pod was ready.
+The primary overhead came from using Envoy solely for gRPC-web → gRPC translation.
+This inspired me to build a lightweight proxy to remove that bottleneck.
 
 This motivated me to build Griffin, a lightweight, purpose-built gRPC-web → gRPC proxy to remove that bottleneck and reduce cold-start latency.
 
