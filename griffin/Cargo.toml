@@ -1,7 +1,11 @@
 [package]
 name = "griffin"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Commandline interface for Griffin"
 
 [dependencies]
 griffin-core = { path = "../griffin-core" }

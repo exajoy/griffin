@@ -2,6 +2,13 @@
 members = ["griffin", "griffin-core", "griffin-test"]
 resolver = "3"
 
+[workspace.package]
+version = "0.0.4"
+authors = ["Dat Vo <vo9312@gmail.com>"]
+edition = "2024"
+license = "AGPL-3.0-or-later"
+homepage = "https://github.com/exajoy/griffin"
+repository = "https://github.com/exajoy/griffin"
 
 [workspace.dependencies]
 tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
