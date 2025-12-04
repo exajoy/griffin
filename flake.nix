@@ -44,9 +44,9 @@
               rel = pkgs.lib.removePrefix (toString ./. + "/") (toString path);
             in
               craneLib.filterCargoSources path type
-              || (pkgs.lib.hasPrefix "griffin/" rel)
-              || (pkgs.lib.hasPrefix "griffin-core/" rel)
-              || (pkgs.lib.hasPrefix "griffin-test/" rel);
+              || (pkgs.lib.hasPrefix "griffin/" rel);
+              # || (pkgs.lib.hasPrefix "griffin-core/" rel)
+              # || (pkgs.lib.hasPrefix "griffin-test/" rel);
               # || (pkgs.lib.hasPrefix "proto/" rel);  # remove if unused
         };
 
