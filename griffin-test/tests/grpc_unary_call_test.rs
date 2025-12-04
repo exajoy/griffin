@@ -1,16 +1,7 @@
-use griffin::{
-    start_proxy,
-    test_support::{
-        greeter::{
-            MyGreeter,
-            hello_world::{
-                HelloRequest, greeter_client::GreeterClient, greeter_server::GreeterServer,
-            },
-        },
-        preparation::run_intergration,
-    },
+use griffin_test::test_support::{
+    greeter::hello_world::{HelloRequest, greeter_client::GreeterClient},
+    preparation::run_intergration,
 };
-use tokio::sync::oneshot;
 use tonic::Request;
 use tower::BoxError;
 

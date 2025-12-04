@@ -1,5 +1,5 @@
 use futures_util::StreamExt;
-use griffin::test_support::{
+use griffin_test::test_support::{
     greeter::hello_world::{HelloRequest, greeter_client::GreeterClient},
     preparation::run_intergration,
 };

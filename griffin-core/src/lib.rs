@@ -4,26 +4,16 @@ use http::{Request, Response, Uri, header::CONTENT_TYPE, uri::Authority};
 use http_body::Frame;
 use http_body_util::StreamBody;
 use hyper::client::conn::http2;
-use hyper_util::server::conn::auto::Builder as AutoBuilder;
-use hyper_util::{
-    rt::{TokioExecutor, TokioIo},
-    service::TowerToHyperService,
-};
+use hyper_util::rt::{TokioExecutor, TokioIo};
 use scopeguard::defer;
-use std::str::FromStr;
 use std::sync::Arc;
-use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::watch;
+use tokio::net::TcpStream;
 use tokio::time::Instant;
 use tower::BoxError;
 
 use crate::core::grpc_kind::GrpcKind;
 use crate::telemetry::metrics::Metrics;
 
-#[cfg(any(test, feature = "test-support"))]
-pub mod test_support;
-
-pub mod command;
 pub mod core;
 pub mod telemetry;
 pub mod trailers;
@@ -95,54 +85,4 @@ where
         .ok_or("Unsupported Content-Type header")?
         .forward(sender, req)
         .await
-}
-
-pub async fn start_proxy(
-    listener: TcpListener,
-    forward_authority: String,
-    mut shutdown_rx: watch::Receiver<bool>,
-) -> Result<(), BoxError> {
-    let forward_authority = Authority::from_str(&forward_authority)?;
-    let metrics = Arc::new(Metrics::new());
-    loop {
-        tokio::select! {
-            accept_result = listener.accept() => {
-                match accept_result {
-                    Ok((stream, _)) => {
-                        let io = TokioIo::new(stream);
-                        let metrics = metrics.clone();
-                        let forward_authority = forward_authority.clone();
-                        tokio::task::spawn(async move {
-
-                            let forward_authority = forward_authority.clone();
-                            let metrics = metrics.clone();
-                            let svc = tower::service_fn(move |req| {
-                                let forward_authority = forward_authority.clone();
-                                let metrics = metrics.clone();
-                                forward(req, forward_authority, metrics)
-                            });
-                            let svc = TowerToHyperService::new(svc);
-                            if let Err(err) = AutoBuilder::new(TokioExecutor::new())
-                                .serve_connection(io, svc)
-                                .await
-                            {
-                                eprintln!("Error serving connection: {:?}", err);
-                            }
-                        });
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to accept connection: {:?}", e);
-                    }
-                }
-            }
-
-             _ = shutdown_rx.changed() => {
-                if *shutdown_rx.borrow() {
-                    println!("Proxy shutdown signal received");
-                    break;
-                }
-            }
-        }
-    }
-    Ok(())
 }

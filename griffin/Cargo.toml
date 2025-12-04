@@ -1,0 +1,31 @@
+[package]
+name = "griffin"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+griffin-core = { path = "../griffin-core" }
+clap = { version = "4.5.51", features = ["derive"] }
+
+hyper.workspace = true
+hyper-util.workspace = true
+async-stream.workspace = true
+bytes.workspace = true
+futures-core.workspace = true
+http.workspace = true
+http-body.workspace = true
+http-body-util.workspace = true
+futures-util.workspace = true
+prometheus.workspace = true
+scopeguard.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tracing.workspace = true
+
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "z"
+panic = "abort"
+strip = true

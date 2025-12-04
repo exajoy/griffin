@@ -1,0 +1,34 @@
+[package]
+name = "griffin-test"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+griffin-core = { path = "../griffin-core" }
+griffin = { path = "../griffin" }
+tokio-stream = { version = "0.1.17", features = ["io-util"] }
+tonic = { version = "0.14.2" }
+prost = { version = "0.14.1" }
+tonic-prost = { version = "0.14.2" }
+
+hyper.workspace = true
+hyper-util.workspace = true
+async-stream.workspace = true
+bytes.workspace = true
+futures-core.workspace = true
+http.workspace = true
+http-body.workspace = true
+http-body-util.workspace = true
+futures-util.workspace = true
+prometheus.workspace = true
+scopeguard.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tracing.workspace = true
+
+
+[dev-dependencies]
+
+[build-dependencies]
+tonic-build = { version = "0.14.2" }
+tonic-prost-build = { version = "0.14.2" }

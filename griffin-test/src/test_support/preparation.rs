@@ -1,18 +1,7 @@
-use futures_util::StreamExt;
-use tokio::{
-    sync::{
-        oneshot::{self, Sender},
-        watch,
-    },
-    task::JoinHandle,
-};
-use tonic::Request;
+use crate::test_support::greeter::{MyGreeter, hello_world::greeter_server::GreeterServer};
+use griffin::start_proxy;
+use tokio::sync::oneshot;
 use tower::BoxError;
-
-use crate::{
-    start_proxy,
-    test_support::greeter::{MyGreeter, hello_world::greeter_server::GreeterServer},
-};
 
 pub async fn run_intergration<F, Fut>(call: F) -> Result<(), BoxError>
 where
