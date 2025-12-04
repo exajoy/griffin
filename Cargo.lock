@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "griffin"
-version = "0.1.0"
+version = "0.0.4"
 dependencies = [
  "async-stream",
  "bytes",
@@ -347,7 +347,7 @@ dependencies = [
 
 [[package]]
 name = "griffin-core"
-version = "0.1.0"
+version = "0.0.4"
 dependencies = [
  "async-stream",
  "bytes",
@@ -367,7 +367,7 @@ dependencies = [
 
 [[package]]
 name = "griffin-test"
-version = "0.1.0"
+version = "0.0.4"
 dependencies = [
  "async-stream",
  "bytes",

@@ -46,7 +46,7 @@ jobs:
         uses: houseabsolute/actions-rust-cross@v1
         with:
           target: ${{ matrix.aarch64-target }}
-          args: "--release --locked"
+          args: "--release --locked -p griffin"
 
       - name: Get latest release version number
         id: get_version
