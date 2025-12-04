@@ -40,7 +40,7 @@ jobs:
         uses: houseabsolute/actions-rust-cross@v1
         with:
           target: ${{ matrix.x86_64-target }}
-          args: "--release --locked"
+          args: "--release --locked -p griffin"
 
       - name: Build aarch64 target in release mode
         uses: houseabsolute/actions-rust-cross@v1
