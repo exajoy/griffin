@@ -25,5 +25,8 @@ jobs:
         with:
           tool: nextest
 
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
       - name: Run nextest tests
         run: cargo nextest run --all
