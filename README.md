@@ -13,27 +13,17 @@ This inspired me to build a lightweight proxy to remove that bottleneck.
 This motivated me to build Griffin, a lightweight, purpose-built gRPC-web → gRPC proxy to remove that bottleneck and reduce cold-start latency.
 
 Griffin is built on top of hyper.rs that translate gRPC-web to standard gRPC requests.
-Griffin's binary is only [1MB](https://github.com/exajoy/griffin/releases), **100x smaller** than Envoy's binary [(140MB+)](https://hub.docker.com/r/envoyproxy/envoy/tags?name=dev) and **15x smaller**
+Griffin's binary is only [1MB](https://github.com/exajoy/griffin/releases), **100x smaller** than
+full Envoy's binary [(140MB+)](https://hub.docker.com/r/envoyproxy/envoy/tags?name=dev) and **15x smaller**
 than grpcwebproxy [(15.3MB)](https://github.com/improbable-eng/grpc-web/releases) **without garbage collection**.
 
 ## Features
 
-Griffin supports both gRPC-web and gRPC traffics at the same time:
-
-- Interoeprability between grpc-web clients and grpc servers
-
-```
-grpc-web client <--> griffin (grpc-web to grpc proxy) <--> grpc server
-```
-
-- Minimal gRPC reverse proxy
-
-```
-grpc client <--> griffin <--> grpc server
-```
-
-- Support 2 types of grpc-web requests (unary and server streaming)
-- Support 4 types standard grpc requests (unary request, server streaming, client streaming, bidi streaming)
+- [x] Telemetry support (Prometheus)
+- [x] Health check support
+- [x] Hot swapping configuration (explain in here)
+- [ ] CORS support
+- [ ] TLS support
 
 ## How to use
 
@@ -78,13 +68,6 @@ cargo build --release
 ```
 
 ## TODO
-
-- [x] Integration tests implementation
-- [ ] Telemetry support
-- [ ] Health check support
-- [ ] CORS support
-- [ ] TLS support
-- [ ] FFI to use in other languages
 
 ## Contribution
 
