@@ -22,6 +22,7 @@ Griffin’s binary is only 1 MB, which is:
 
 ## Features
 
+- [x] Handles both gRPC-Web and standard gRPC traffic (explain in [here](/docs/flow.md))
 - [x] Telemetry support (Prometheus)
 - [x] Health check support
 - [x] Hot configuration reload (explain in [here](/docs/hot_config_reload.md))

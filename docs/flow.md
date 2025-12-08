@@ -1,18 +1,42 @@
-## Request flow
+## RPC flow and Protocol Support
 
-Griffin supports both gRPC-web and gRPC traffics at the same time:
+Griffin is designed to handle both gRPC-Web and standard gRPC traffic
+concurrently, enabling seamless interoperability between
+browser-based clients and backend gRPC services.
 
-- Interoeprability between grpc-web clients and grpc servers
+### 1. gRPC-Web Interoperability
 
-```
-grpc-web client <--> griffin (grpc-web to grpc proxy) <--> grpc server
-```
-
-- Minimal gRPC reverse proxy
+Griffin acts as a translation layer between gRPC-Web clients and standard gRPC servers:
 
 ```
-grpc client <--> griffin <--> grpc server
+gRPC-Web Client ⇄ Griffin (Web ↔ gRPC Translation) ⇄ gRPC Server
 ```
 
-- Support 2 types of grpc-web requests (unary and server streaming)
-- Support 4 types standard grpc requests (unary request, server streaming, client streaming, bidi streaming)
+This allows browser environments—where native gRPC over HTTP/2 is not available—to
+communicate with existing gRPC services without requiring Envoy or other heavy intermediaries.
+
+### 2. Lightweight gRPC Reverse Proxy
+
+Griffin can also operate as a minimal reverse proxy for native gRPC traffic:
+
+```
+gRPC Client ⇄ Griffin ⇄ gRPC Server
+```
+
+This makes it suitable for routing, connection management, or hot-reload configurations without introducing unnecessary overhead.
+
+### 3. Supported RPC Types
+
+Griffin fully supports the core RPC patterns for both protocols:
+
+gRPC-Web
+
+- Unary
+- Server-streaming
+
+Standard gRPC
+
+- Unary
+- Server-streaming
+- Client-streaming
+- Bidirectional streaming
