@@ -1,21 +1,24 @@
 <img src="misc/logo/logo.png" width="200" />
 
-# Griffin - A lightweight gRPC-Web to gRPC proxy
+# Griffin - A lightweight gRPC-Web and gRPC proxy
 
-<!-- In the world of package transmission, gRPC-Web and gRPC are becoming increasingly polular. -->
-<!-- However, the current solutions of converting gRPRC-Web to gRPC, such as Envoy, -->
-<!-- are often too large and complex for lightweight applications. -->
+In my previous role, we struggled with slow Pod cold starts.
+Whenever a Pod spun up, incoming requests would pile up
+and wait until it was finally ready. Most of that delay
+came from running Envoy just to handle the gRPC-Web → gRPC
+translation layer. It felt like using a huge,
+complex system for a very small piece of functionality.
 
-In my previous role, Pods experienced slow cold starts, causing requests to queue until the Pod was ready.
-The primary overhead came from using Envoy solely for gRPC-web → gRPC translation.
-This inspired me to build a lightweight proxy to remove that bottleneck.
+That experience pushed me to build Griffin — a lightweight
+proxy designed specifically to remove that bottleneck.
+Griffin is built on top of hyper.rs and focuses on doing
+one thing well: translating gRPC-Web requests into standard gRPC calls.
 
-This motivated me to build Griffin, a lightweight, purpose-built gRPC-web → gRPC proxy to remove that bottleneck and reduce cold-start latency.
-
-Griffin is built on top of hyper.rs that translate gRPC-web to standard gRPC requests.
-Griffin's binary is only [1MB](https://github.com/exajoy/griffin/releases), **100x smaller** than
-full Envoy's binary [(140MB+)](https://hub.docker.com/r/envoyproxy/envoy/tags?name=dev) and **15x smaller**
-than grpcwebproxy [(15.3MB)](https://github.com/improbable-eng/grpc-web/releases) **without garbage collection**.
+The result is a proxy that’s incredibly small and fast.
+Griffin’s binary is only 1 MB, which is:
+• 100× smaller than a full Envoy build (~140 MB+)
+• 15× smaller than grpcwebproxy (~15.3 MB)
+• no garbage collector
 
 ## Features
 
@@ -33,31 +36,13 @@ griffin -c config.yaml
 
 You can find example here [default_config.yaml](/griffin/default_config.yaml).
 
-## Inspirations
-
-[Grpc Web](https://github.com/improbable-eng/grpc-web)
-
-[Tonic](https://github.com/hyperium/tonic)
-
-## Implementation Documents
-
-<https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md>
-
-<https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-WEB.md>
-
-<https://datatracker.ietf.org/doc/rfc7540/>
-
-## Installation
-
-### Build from source
-
-#### Requirements
+### Requirements
 
 rustc 1.91.0
 
 cargo 1.81.0
 
-#### Commands
+### Run from source
 
 ```ssh
 git clone https://github.com/exajoy/griffin
@@ -65,21 +50,18 @@ cd griffin
 cargo build --release
 ```
 
-## TODO
-
-## Contribution
-
-Please feel free to open issues or submit pull requests.
-
-### Run tests (unit tests and integration tests)
+### Run tests
 
 ```ssh
-cargo test --feature test
+cargo netest --feature test
 ```
 
 ## FAQs
 
-### 1. Why this proxy is called Griffin?
+You can see more FAQs in [here](/docs/faqs.md).
 
-Griffin is a hybrid mythical creature with the body of a lion and the head and wings of an eagle.
-This proxy is a hybrid proxy that combines gRPC-web and gRPC functionalities, just like a Griffin.
+## Contribution
+
+Please feel free to open issues or submit pull requests.
+Make sure to follow the existing code style and include
+tests for any new features or bug fixes.
