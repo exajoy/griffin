@@ -2,7 +2,7 @@
 
 # Griffin - A lightweight gRPC-Web and gRPC proxy
 
-In my previous role, we struggled with slow Pod cold starts.
+In my previous role, I struggled with slow Pod cold starts.
 Whenever a Pod spun up, incoming requests would pile up
 and wait until it was finally ready. Most of that delay
 came from running Envoy just to handle the gRPC-Web → gRPC
@@ -40,9 +40,8 @@ You can find example here [default_config.yaml](/griffin/default_config.yaml).
 
 ### Requirements
 
-rustc 1.91.0
-
-cargo 1.81.0
+- rustc 1.91.0
+- cargo 1.81.0
 
 ### Run from source
 
@@ -55,7 +54,7 @@ cargo build --release
 ### Run tests
 
 ```ssh
-cargo netest --feature test
+cargo nextest run --all
 ```
 
 ## FAQs
