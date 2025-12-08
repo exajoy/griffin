@@ -21,19 +21,17 @@ than grpcwebproxy [(15.3MB)](https://github.com/improbable-eng/grpc-web/releases
 
 - [x] Telemetry support (Prometheus)
 - [x] Health check support
-- [x] Hot swapping configuration (explain in here)
+- [x] Hot configuration reload (explain in [here](/docs/hot_config_reload.md))
 - [ ] CORS support
 - [ ] TLS support
 
 ## How to use
 
 ```ssh
-griffin \
---proxy-host=127.0.0.1 \
---proxy-port=8080 \
---forward-host=127.0.0.1 \
---forward-port=3000
+griffin -c config.yaml
 ```
+
+You can find example here [default_config.yaml](/griffin/default_config.yaml).
 
 ## Inspirations
 
