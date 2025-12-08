@@ -16,9 +16,10 @@ one thing well: translating gRPC-Web requests into standard gRPC calls.
 
 The result is a proxy that’s incredibly small and fast.
 Griffin’s binary is only 1 MB, which is:
-• 100× smaller than a full Envoy build (~140 MB+)
-• 15× smaller than grpcwebproxy (~15.3 MB)
-• no garbage collector
+
+- 100× smaller than a full Envoy build (~140 MB+)
+- 15× smaller than grpcwebproxy (~15.3 MB)
+- no garbage collector
 
 ## Features
 
