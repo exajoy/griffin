@@ -3,33 +3,46 @@ use std::convert::Infallible;
 use async_stream::try_stream;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full, StreamBody};
+use once_cell::sync::Lazy;
 use prometheus::{
     CounterVec, Encoder, HistogramVec, TextEncoder, register_counter_vec, register_histogram_vec,
 };
 
 use crate::core::stream_response::StreamResponse;
+//
+// 1. METRICS ARE REGISTERED *ONCE* HERE
+//
+pub static REQUESTS_TOTAL: Lazy<CounterVec> = Lazy::new(|| {
+    register_counter_vec!(
+        "http_requests_total",
+        "Total number of HTTP requests handled",
+        &["method", "path"]
+    )
+    .expect("metric already registered")
+});
+
+pub static REQUEST_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "http_request_duration_seconds",
+        "Request duration in seconds",
+        &["method", "path"]
+    )
+    .expect("metric already registered")
+});
 #[derive(Clone)]
-pub struct Metrics {
-    pub requests_total: CounterVec,
-    pub request_duration: HistogramVec,
-}
+pub struct Metrics;
 
 impl Metrics {
     pub fn new() -> Self {
-        Self {
-            requests_total: register_counter_vec!(
-                "http_requests_total",
-                "Total number of HTTP requests handled",
-                &["method", "path"]
-            )
-            .unwrap(),
-            request_duration: register_histogram_vec!(
-                "http_request_duration_seconds",
-                "Request duration in seconds",
-                &["method", "path"]
-            )
-            .unwrap(),
-        }
+        Metrics
+    }
+
+    pub fn requests_total(&self) -> &CounterVec {
+        &REQUESTS_TOTAL
+    }
+
+    pub fn request_duration(&self) -> &HistogramVec {
+        &REQUEST_DURATION
     }
 
     pub fn render(&self) -> StreamResponse {

@@ -1,0 +1,5 @@
+message: "this field is for test only"
+proxy_host: "127.0.0.1"
+proxy_port: 8080
+forward_host: "127.0.0.1"
+forward_port: 3000

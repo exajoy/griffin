@@ -26,9 +26,11 @@ http-body-util.workspace = true
 futures-util.workspace = true
 prometheus.workspace = true
 scopeguard.workspace = true
-tokio.workspace = true
+
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 tower.workspace = true
 tracing.workspace = true
+tonic-web = "0.14.2"
 
 
 [dev-dependencies]

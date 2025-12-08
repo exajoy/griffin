@@ -46,11 +46,11 @@ where
     defer!({
         let elapsed = start.elapsed().as_secs_f64();
         metrics
-            .requests_total
+            .requests_total()
             .with_label_values(&[&"POST", &path.as_str()])
             .inc();
         metrics
-            .request_duration
+            .request_duration()
             .with_label_values(&[&"POST", &path.as_str()])
             .observe(elapsed);
     });

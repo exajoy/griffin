@@ -11,7 +11,12 @@ homepage = "https://github.com/exajoy/griffin"
 repository = "https://github.com/exajoy/griffin"
 
 [workspace.dependencies]
-tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.48.0", features = [
+  "macros",
+  "rt-multi-thread",
+  "fs",
+  "signal",
+] }
 tower = { version = "0.5.2", features = ["util"] }
 tracing = { version = "0.1.41", features = ["log"] }
 async-stream = "0.3.6"

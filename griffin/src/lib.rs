@@ -1,6 +1,3 @@
-use clap::Parser;
-use command::args::Args;
-
 use griffin_core::forward;
 use griffin_core::telemetry::metrics::Metrics;
 use http::uri::Authority;
@@ -15,7 +12,9 @@ use tokio::net::TcpListener;
 use tokio::sync::watch;
 use tower::BoxError;
 
-pub mod command;
+pub mod args;
+pub mod config;
+pub mod listener;
 
 pub async fn start_proxy(
     listener: TcpListener,
@@ -29,25 +28,7 @@ pub async fn start_proxy(
             accept_result = listener.accept() => {
                 match accept_result {
                     Ok((stream, _)) => {
-                        let io = TokioIo::new(stream);
-                        let metrics = metrics.clone();
-                        let forward_authority = forward_authority.clone();
-                        tokio::task::spawn(async move {
-                            let forward_authority = forward_authority.clone();
-                            let metrics = metrics.clone();
-                            let svc = tower::service_fn(move |req| {
-                                let forward_authority = forward_authority.clone();
-                                let metrics = metrics.clone();
-                                forward(req, forward_authority, metrics)
-                            });
-                            let svc = TowerToHyperService::new(svc);
-                            if let Err(err) = AutoBuilder::new(TokioExecutor::new())
-                                .serve_connection(io, svc)
-                                .await
-                            {
-                                eprintln!("Error serving connection: {:?}", err);
-                            }
-                        });
+                        run_proxy(stream, metrics.clone(), forward_authority.clone());
                     }
                     Err(e) => {
                         eprintln!("Failed to accept connection: {:?}", e);
@@ -64,4 +45,31 @@ pub async fn start_proxy(
         }
     }
     Ok(())
+}
+
+pub fn run_proxy(
+    stream: tokio::net::TcpStream,
+    metrics: Arc<Metrics>,
+    forward_authority: Authority,
+) {
+    // Placeholder for potential future implementation
+    let io = TokioIo::new(stream);
+    let metrics = metrics.clone();
+    let forward_authority = forward_authority.clone();
+    tokio::task::spawn(async move {
+        let forward_authority = forward_authority.clone();
+        let metrics = metrics.clone();
+        let svc = tower::service_fn(move |req| {
+            let forward_authority = forward_authority.clone();
+            let metrics = metrics.clone();
+            forward(req, forward_authority, metrics)
+        });
+        let svc = TowerToHyperService::new(svc);
+        if let Err(err) = AutoBuilder::new(TokioExecutor::new())
+            .serve_connection(io, svc)
+            .await
+        {
+            eprintln!("Error serving connection: {:?}", err);
+        }
+    });
 }
