@@ -15,6 +15,7 @@ use tower::BoxError;
 pub mod args;
 pub mod config;
 pub mod listener;
+pub mod stream_handler;
 
 pub async fn start_proxy(
     listener: TcpListener,

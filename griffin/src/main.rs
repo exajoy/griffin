@@ -3,6 +3,7 @@ use griffin::{
     args::args::Args,
     config::{loader::ConfigLoader, manager::ConfigManager},
     listener::manager::ListenerManager,
+    stream_handler::stream_handler::{RealStreamHandler, StreamHandler},
 };
 use std::path::PathBuf;
 use tokio::sync::mpsc::unbounded_channel;
@@ -17,9 +18,11 @@ async fn main() -> Result<(), BoxError> {
     let initial_cfg = ConfigLoader::from_file(&config_path)?;
     let cfg_manager = ConfigManager::new(initial_cfg.clone());
 
+    let proxy_handler = RealStreamHandler;
     // start initial listener and listener manager
-    let initial_listener = ListenerManager::start_listener(initial_cfg).await;
-    let listener_manager = ListenerManager::new(initial_listener);
+    let initial_listener =
+        ListenerManager::start_listener(initial_cfg, proxy_handler.clone()).await;
+    let listener_manager = ListenerManager::new(initial_listener, proxy_handler);
 
     // a channel to notify listener reload on config changes
     let (reload_tx, mut reload_rx) = unbounded_channel::<()>();
