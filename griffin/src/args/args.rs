@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Parser, Debug, Deserialize, Serialize)]
 #[command(name = "server", about = "Run the server with options")]
 pub struct Args {
+    //INFO: `griffin -c default_config.yaml`
     #[arg(
         short,
         alias = "c",

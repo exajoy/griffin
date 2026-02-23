@@ -1,4 +1,4 @@
-use griffin_core::forward;
+use griffin_core::proxy_request;
 use griffin_core::telemetry::metrics::Metrics;
 use http::uri::Authority;
 use hyper_util::server::conn::auto::Builder as AutoBuilder;
@@ -60,7 +60,7 @@ pub fn run_proxy(
         let svc = tower::service_fn(move |req| {
             let forward_authority = forward_authority.clone();
             let metrics = metrics.clone();
-            forward(req, forward_authority, metrics)
+            proxy_request(req, forward_authority, metrics)
         });
         let svc = TowerToHyperService::new(svc);
         if let Err(err) = AutoBuilder::new(TokioExecutor::new())

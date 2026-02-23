@@ -1,8 +1,6 @@
 use bytes::Bytes;
-use futures_core::Stream;
 use http::{Request, Response, Uri, header::CONTENT_TYPE, uri::Authority};
-use http_body::Frame;
-use http_body_util::StreamBody;
+use http_body_util::combinators::BoxBody;
 use hyper::client::conn::http2;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use scopeguard::defer;
@@ -17,15 +15,12 @@ use crate::telemetry::metrics::Metrics;
 pub mod core;
 pub mod telemetry;
 pub mod trailers;
-
-pub async fn forward<B>(
+pub type ProxyResponse = Response<BoxBody<Bytes, hyper::Error>>;
+pub async fn proxy_request<B>(
     req: Request<B>,
     authority: Authority,
     metrics: Arc<Metrics>,
-) -> Result<
-    Response<StreamBody<impl Stream<Item = Result<Frame<Bytes>, hyper::Error>> + Send>>,
-    BoxError,
->
+) -> Result<ProxyResponse, BoxError>
 where
     B: hyper::body::Body<Data = Bytes> + Send + 'static + Unpin,
     B::Error: Into<BoxError>,

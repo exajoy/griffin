@@ -2,13 +2,15 @@ use std::convert::Infallible;
 
 use async_stream::try_stream;
 use bytes::Bytes;
-use http_body_util::{BodyExt, Full, StreamBody};
+use http::Response;
+use http_body::Body;
+use http_body_util::{BodyExt, Full, StreamBody, combinators::BoxBody};
 use once_cell::sync::Lazy;
 use prometheus::{
     CounterVec, Encoder, HistogramVec, TextEncoder, register_counter_vec, register_histogram_vec,
 };
 
-use crate::core::stream_response::StreamResponse;
+// use crate::core::stream_response::StreamResponse;
 //
 // 1. METRICS ARE REGISTERED *ONCE* HERE
 //
@@ -45,7 +47,7 @@ impl Metrics {
         &REQUEST_DURATION
     }
 
-    pub fn render(&self) -> StreamResponse {
+    pub fn render(&self) -> Response<BoxBody<Bytes, hyper::Error>> {
         let encoder = TextEncoder::new();
         let metric_families = prometheus::gather();
         let mut buffer = Vec::new();
@@ -62,13 +64,15 @@ impl Default for Metrics {
     }
 }
 
-pub fn from_full_bytes(mut body: Full<Bytes>) -> StreamResponse {
-    let forward_stream = try_stream! {
-        while let Some(frame) = body.frame().await {
-            let frame = frame.map_err(|e: Infallible| -> hyper::Error { match e {} })?;
-            yield frame;
-        }
-    };
-
-    StreamResponse::new(StreamBody::new(Box::pin(forward_stream)))
+pub fn from_full_bytes(body: Full<Bytes>) -> Response<BoxBody<Bytes, hyper::Error>> {
+    let body = body.map_err(|never: Infallible| match never {}).boxed();
+    Response::new(body)
+    // let forward_stream = try_stream! {
+    //     while let Some(frame) = body.frame().await {
+    //         let frame = frame.map_err(|e: Infallible| -> hyper::Error { match e {} })?;
+    //         yield frame;
+    //     }
+    // };
+    //
+    // StreamResponse::new(StreamBody::new(Box::pin(forward_stream)))
 }

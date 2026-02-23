@@ -4,7 +4,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{Mutex, watch};
-use tokio::task::JoinHandle;
 use tower::BoxError;
 
 use crate::config::config::Config;
@@ -14,22 +13,23 @@ use crate::proxy::proxy_instance::ProxyInstance;
 /// manages hot-swapping listeners
 pub struct ProxySupervisor<H: ConnectionHandler + Clone> {
     ///ArcSwap allows instant pointer swap with no locks.
-    pub current: arc_swap::ArcSwapOption<ProxyInstance>,
-    pub connection_handler: H,
-    pub draining: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    pub active_proxy: arc_swap::ArcSwapOption<ProxyInstance>,
+    pub connection_handler: Arc<H>,
 }
 
 impl<H: ConnectionHandler + Clone> ProxySupervisor<H> {
     pub fn new(connection_handler: H) -> Self {
         ProxySupervisor {
-            current: arc_swap::ArcSwapOption::<ProxyInstance>::from(None),
-            connection_handler,
-            draining: Arc::new(Mutex::new(Vec::new())),
+            active_proxy: arc_swap::ArcSwapOption::<ProxyInstance>::from(None),
+            connection_handler: Arc::new(connection_handler),
         }
     }
 
     /// Start a TCP accept loop
-    pub async fn spawn_proxy_server(config: Config, handler: H) -> Arc<ProxyInstance> {
+    pub async fn spawn_proxy_server(
+        config: Config,
+        connection_handler: Arc<H>,
+    ) -> Arc<ProxyInstance> {
         let listen_address = format!("{}:{}", config.listen_host, config.listen_port);
         let target_authority = format!("{}:{}", config.target_host, config.target_port);
 
@@ -67,8 +67,16 @@ impl<H: ConnectionHandler + Clone> ProxySupervisor<H> {
                     accept = listener.accept() => {
                         match accept {
                             Ok(( stream, _peer)) => {
-                                // println!("Accepted from {:?}", peer);
-                                handler.handle (stream, metrics.clone(), target_authority.clone(), listen_address.as_str());
+                                let connection_handler = Arc::clone(&connection_handler);
+                                tokio::spawn({
+                                    let metrics = metrics.clone();
+                                    let target_authority = target_authority.clone();
+                                    async move {
+                                        connection_handler
+                                            .serve_connection(stream, metrics, target_authority)
+                                            .await;
+                                    }
+                                });
                             }
                             Err(e) => eprintln!("Accept error: {}", e),
                         }
@@ -87,7 +95,7 @@ impl<H: ConnectionHandler + Clone> ProxySupervisor<H> {
 
     /// Hot-reload: start new listener, drain old one
     pub async fn load_listener(&self, config: Config) -> Result<(), BoxError> {
-        let maybe_old_pi = self.current.load_full();
+        let maybe_old_pi = self.active_proxy.load_full();
         if let Some(old_pi) = maybe_old_pi {
             // stop the old accept loop first
             old_pi.shutdown_tx.send(true)?;
@@ -103,7 +111,7 @@ impl<H: ConnectionHandler + Clone> ProxySupervisor<H> {
         let new_pi = ProxySupervisor::spawn_proxy_server(config, connection_handler).await;
 
         // swap pointers
-        let maybe_old_pi = self.current.swap(Some(new_pi.clone()));
+        let maybe_old_pi = self.active_proxy.swap(Some(new_pi.clone()));
 
         if let Some(old_pi) = maybe_old_pi {
             // println!("Hot-reloading config {:#?}", cloned_config);
@@ -127,6 +135,8 @@ impl<H: ConnectionHandler + Clone> ProxySupervisor<H> {
 
 #[cfg(test)]
 mod tests {
+    use std::net::SocketAddr;
+
     use crate::connection::connection_handler::ConnectionHandler;
 
     use super::*;
@@ -139,45 +149,47 @@ mod tests {
     }
 
     impl ConnectionHandler for MockStreamHandler {
-        fn handle(
+        async fn serve_connection(
             &self,
             mut stream: tokio::net::TcpStream,
             _metrics: Arc<Metrics>,
-            _authority: Authority,
-            listen_address: &str,
+            authority: Authority,
         ) {
             let notify = self.notify.clone();
 
-            let listen_address = listen_address.to_string();
-            let backend_id = format!("server: {}", listen_address);
-            tokio::spawn(async move {
-                let mut buf = [0u8; 1024];
-                if let Ok(n) = stream.read(&mut buf).await {
-                    let text = String::from_utf8_lossy(&buf[..n]);
-                    println!("[{}] received string: {}", backend_id, text);
-                }
-                println!("[{}] will wait", backend_id);
-                // Simulate long-running request
-                notify.notified().await;
-                println!("[{}] continues", backend_id);
-                // Write response
-                if let Err(e) = stream.write_all(b"hello from backend").await {
-                    eprintln!("write error: {:?}", e);
-                    return;
-                }
+            let host = authority.host();
+            let port = authority.port_u16().unwrap_or(80);
+            let address: SocketAddr = format!("{}:{}", host, port)
+                .parse()
+                .expect("invalid socket addr");
+            // let listen_address = listen_address.to_string();
+            let backend_id = format!("server: {}", address);
+            let mut buf = [0u8; 1024];
+            if let Ok(n) = stream.read(&mut buf).await {
+                let text = String::from_utf8_lossy(&buf[..n]);
+                println!("[{}] received string: {}", backend_id, text);
+            }
+            println!("[{}] will wait", backend_id);
+            // Simulate long-running request
+            notify.notified().await;
+            println!("[{}] continues", backend_id);
+            // Write response
+            if let Err(e) = stream.write_all(b"hello from backend").await {
+                eprintln!("write error: {:?}", e);
+                return;
+            }
 
-                // Ensure all bytes are pushed out to kernel buffers
-                if let Err(e) = stream.flush().await {
-                    eprintln!("flush error: {:?}", e);
-                    return;
-                }
+            // Ensure all bytes are pushed out to kernel buffers
+            if let Err(e) = stream.flush().await {
+                eprintln!("flush error: {:?}", e);
+                return;
+            }
 
-                println!("[{}] shutdown", backend_id);
-                // Gracefully close write half → client receives FIN (EOF)
-                let _ = stream.shutdown().await;
-                stream.shutdown().await.ok();
-                drop(stream);
-            });
+            println!("[{}] shutdown", backend_id);
+            // Gracefully close write half → client receives FIN (EOF)
+            let _ = stream.shutdown().await;
+            stream.shutdown().await.ok();
+            drop(stream);
         }
     }
     async fn get_free_port() -> Result<u16, std::io::Error> {
@@ -370,8 +382,8 @@ mod tests {
         //     ProxySupervisor::spawn_proxy_server(cfg.clone(), mock_handler.clone()).await;
 
         let proxy_supervisor = ProxySupervisor::new(mock_handler.clone());
-
         proxy_supervisor.load_listener(cfg.clone()).await;
+
         let address = format!("{}:{}", cfg.listen_host, cfg.listen_port);
         let client = spawn_real_tcp_client(&address).await;
 

@@ -1,13 +1,10 @@
-use async_stream::try_stream;
+use bytes::Bytes;
 use http::{HeaderValue, Request, Response};
 use http_body::Frame;
-use http_body_util::{BodyExt, StreamBody};
+use http_body_util::{BodyExt, combinators::BoxBody};
 use hyper::body::Incoming;
 
-use crate::{
-    core::stream_response::{DynStream, StreamResponse},
-    trailers::Trailers,
-};
+use crate::trailers::Trailers;
 pub struct GrpcKindWeb;
 impl GrpcKindWeb {
     pub fn modify_request<B>(&self, req: &mut Request<B>)
@@ -21,26 +18,23 @@ impl GrpcKindWeb {
         req.headers_mut().remove(hyper::header::CONTENT_LENGTH);
     }
 
-    pub fn modify_response(&self, res: Response<Incoming>) -> StreamResponse {
-        let (parts, mut body) = res.into_parts();
-
-        let forward_stream = try_stream! {
-            while let Some(frame) = body.frame().await {
-                let frame = frame?;
-
+    pub fn modify_response(
+        &self,
+        res: Response<Incoming>,
+    ) -> Response<BoxBody<Bytes, hyper::Error>> {
+        let (parts, body) = res.into_parts();
+        let transformed = body
+            .map_frame(|frame| {
                 if let Some(trailers) = frame.trailers_ref() {
                     let t = Trailers::new(trailers.clone());
-                    yield Frame::data(t.into_to_frame());
+                    Frame::data(t.into_to_frame())
                 } else {
-                    yield frame;
+                    frame
                 }
-            }
-        };
+            })
+            .boxed();
 
-        let boxed: DynStream = Box::pin(forward_stream);
-        let body = StreamBody::new(boxed);
-
-        let mut res = Response::from_parts(parts, body);
+        let mut res = Response::from_parts(parts, transformed);
         res.headers_mut().insert(
             http::header::CONTENT_TYPE,
             HeaderValue::from_static("application/grpc-web+proto"),

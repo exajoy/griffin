@@ -1,9 +1,9 @@
 use bytes::Bytes;
-use http::{HeaderValue, Request};
+use http::{HeaderValue, Request, Response};
+use http_body_util::combinators::BoxBody;
 use hyper::client::conn::http2;
 use tower::BoxError;
 
-use crate::core::stream_response::StreamResponse;
 use crate::core::{grpc_kind_plain::GrpcKindPlain, grpc_kind_web::GrpcKindWeb};
 
 pub enum GrpcKind {
@@ -26,7 +26,7 @@ impl GrpcKind {
         self,
         mut sender: http2::SendRequest<B>,
         mut req: Request<B>,
-    ) -> Result<StreamResponse, BoxError>
+    ) -> Result<Response<BoxBody<Bytes, hyper::Error>>, BoxError>
     where
         B: hyper::body::Body<Data = Bytes> + Send + 'static,
         B::Error: Into<BoxError>,
