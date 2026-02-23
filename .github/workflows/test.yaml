@@ -26,7 +26,13 @@ jobs:
           tool: nextest
 
       - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+        run: |
+          sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install sccache
+        run: |
+          cargo install sccache
 
       - name: Run nextest tests
-        run: cargo nextest run --all
+        run: |
+          cargo nextest run --all
