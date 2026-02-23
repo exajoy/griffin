@@ -1,5 +1,5 @@
 message: "this field is for test only"
-proxy_host: "127.0.0.1"
-proxy_port: 8080
+listen_host: "127.0.0.1"
+listen_port: 8080
 target_host: "127.0.0.1"
 target_port: 3000

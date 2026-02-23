@@ -36,7 +36,7 @@ pub struct ProxyInstance {
     ///- call .await
     ///- get result
     ///- guarantee complete flush
-    pub task: Arc<Mutex<Option<JoinHandle<()>>>>,
+    pub accept_conns: Arc<Mutex<Option<JoinHandle<()>>>>,
 
     pub listen_address: String,
     /// shutdown signal sender

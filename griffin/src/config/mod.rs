@@ -8,6 +8,5 @@
 //!
 pub mod config;
 pub mod controller;
-pub mod loader;
+pub mod reload_channel;
 pub mod store;
-pub mod watcher;

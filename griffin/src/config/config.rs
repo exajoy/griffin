@@ -1,3 +1,6 @@
+use anyhow::Result;
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -11,6 +14,7 @@ pub struct Config {
     pub target_host: String,
     pub target_port: u16,
 }
+
 impl Config {
     #[cfg(test)]
     pub fn with_message(message: String) -> Self {
@@ -18,6 +22,11 @@ impl Config {
             message,
             ..Default::default()
         }
+    }
+    pub fn from_file(path: &Path) -> Result<Self> {
+        let txt = std::fs::read_to_string(path)?;
+        let config = serde_yaml::from_str(&txt)?;
+        Ok(config)
     }
 }
 impl Default for Config {

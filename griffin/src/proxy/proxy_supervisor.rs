@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{Mutex, watch};
 use tokio::task::JoinHandle;
+use tower::BoxError;
 
 use crate::config::config::Config;
 use crate::connection::connection_handler::ConnectionHandler;
@@ -13,16 +14,16 @@ use crate::proxy::proxy_instance::ProxyInstance;
 /// manages hot-swapping listeners
 pub struct ProxySupervisor<H: ConnectionHandler + Clone> {
     ///ArcSwap allows instant pointer swap with no locks.
-    pub current: arc_swap::ArcSwap<ProxyInstance>,
-    pub handler: H,
+    pub current: arc_swap::ArcSwapOption<ProxyInstance>,
+    pub connection_handler: H,
     pub draining: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl<H: ConnectionHandler + Clone> ProxySupervisor<H> {
-    pub fn new(initial: Arc<ProxyInstance>, handler: H) -> Self {
+    pub fn new(connection_handler: H) -> Self {
         ProxySupervisor {
-            current: arc_swap::ArcSwap::from(initial),
-            handler,
+            current: arc_swap::ArcSwapOption::<ProxyInstance>::from(None),
+            connection_handler,
             draining: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -41,13 +42,11 @@ impl<H: ConnectionHandler + Clone> ProxySupervisor<H> {
         let target_authority = Authority::from_str(&target_authority).unwrap();
 
         let listen_address_clone = listen_address.clone();
-        // println!(
-        //     "[shutdown] sender_count={} receiver_count={}",
-        //     shutdown_tx.sender_count(),
-        //     shutdown_tx.receiver_count(),
-        // );
-        let task = tokio::spawn(async move {
+        let accept_conns = tokio::spawn(async move {
             loop {
+                // INFO: if there is notification on shutdown_rx,
+                // break the loop and stop accepting new
+                // connections
                 tokio::select! {
                     result = shutdown_rx.changed() => {
                         match result {
@@ -80,47 +79,51 @@ impl<H: ConnectionHandler + Clone> ProxySupervisor<H> {
         });
 
         Arc::new(ProxyInstance {
-            task: Arc::new(Mutex::new(Some(task))),
+            accept_conns: Arc::new(Mutex::new(Some(accept_conns))),
             shutdown_tx,
             listen_address: listen_address_clone,
         })
     }
 
     /// Hot-reload: start new listener, drain old one
-    pub async fn reload_listener(&self, config: Config) {
-        println!("Hot-reloading config {:#?}", config);
-
-        let old = self.current.load_full();
-        // stop the old accept loop first
-        let _ = old.shutdown_tx.send(true);
+    pub async fn load_listener(&self, config: Config) -> Result<(), BoxError> {
+        let maybe_old_pi = self.current.load_full();
+        if let Some(old_pi) = maybe_old_pi {
+            // stop the old accept loop first
+            old_pi.shutdown_tx.send(true)?;
+        }
 
         // wait until accept loop exits
         tokio::task::yield_now().await;
 
-        let handler = self.handler.clone();
+        let connection_handler = self.connection_handler.clone();
+
+        // let cloned_config = config.clone();
         //  bind new listener
-        let new = ProxySupervisor::spawn_proxy_server(config, handler).await;
+        let new_pi = ProxySupervisor::spawn_proxy_server(config, connection_handler).await;
 
         // swap pointers
-        let old = self.current.swap(new.clone());
+        let maybe_old_pi = self.current.swap(Some(new_pi.clone()));
 
-        let listen_address = old.listen_address.clone();
-        // get old task
-        let old_task = old.task.lock().await.take().unwrap();
+        if let Some(old_pi) = maybe_old_pi {
+            // println!("Hot-reloading config {:#?}", cloned_config);
+            let listen_address = old_pi.listen_address.clone();
+            // get old task
+            let accept_conns = old_pi.accept_conns.lock().await.take().unwrap();
 
-        // execute listener
-        // to background task
-        // avoids blocking the reload flow
-        tokio::spawn(async move {
-            match old_task.await {
-                Ok(_) => println!("[server: {}] drained", listen_address),
-                Err(e) => println!("Failed to drain old listener: {:?}", e),
-            }
-        });
+            // resume polling old listener in another thread
+            // it will not receive new connections
+            // it drains existing connections gracefully
+            tokio::spawn(async move {
+                match accept_conns.await {
+                    Ok(_) => println!("[server: {}] drained", listen_address),
+                    Err(e) => println!("Failed to drain old listener: {:?}", e),
+                }
+            });
+        }
+        Ok(())
     }
 }
-
-// pub type TaskWrapper = JoinHandle<()>;
 
 #[cfg(test)]
 mod tests {
@@ -226,11 +229,12 @@ mod tests {
         let mock_handler = MockStreamHandler {
             notify: notify.clone(),
         };
-        let initial_listener =
-            ProxySupervisor::spawn_proxy_server(cfg1.clone(), mock_handler.clone()).await;
+        // let initial_listener =
+        //     ProxySupervisor::spawn_proxy_server(cfg1.clone(), mock_handler.clone()).await;
 
-        let lister_manager = ProxySupervisor::new(initial_listener.clone(), mock_handler.clone());
+        let proxy_supervisor = ProxySupervisor::new(mock_handler.clone());
 
+        proxy_supervisor.load_listener(cfg1.clone()).await;
         let address_1 = format!("{}:{}", cfg1.listen_host, cfg1.listen_port);
         let client = spawn_real_tcp_client(&address_1).await;
 
@@ -249,8 +253,7 @@ mod tests {
         };
         // trigger reload
 
-        lister_manager.reload_listener(cfg2.clone()).await;
-
+        proxy_supervisor.load_listener(cfg2.clone()).await;
         // old listener should not accept new connections
         assert!(
             TcpStream::connect(address_1).await.is_err(),
@@ -298,10 +301,12 @@ mod tests {
         let mock_handler = MockStreamHandler {
             notify: notify.clone(),
         };
-        let initial_listener =
-            ProxySupervisor::spawn_proxy_server(cfg1.clone(), mock_handler.clone()).await;
+        // let initial_listener =
+        //     ProxySupervisor::spawn_proxy_server(cfg1.clone(), mock_handler.clone()).await;
 
-        let lister_manager = ProxySupervisor::new(initial_listener.clone(), mock_handler.clone());
+        let proxy_supervisor = ProxySupervisor::new(mock_handler.clone());
+
+        proxy_supervisor.load_listener(cfg1.clone()).await;
 
         let address = format!("{}:{}", cfg1.listen_host, cfg1.listen_port);
         let client = spawn_real_tcp_client(&address).await;
@@ -319,7 +324,7 @@ mod tests {
         };
         // trigger reload
 
-        lister_manager.reload_listener(cfg2.clone()).await;
+        proxy_supervisor.load_listener(cfg2.clone()).await;
 
         // listener should still accept new connections
         assert!(
@@ -361,11 +366,12 @@ mod tests {
         let mock_handler = MockStreamHandler {
             notify: notify.clone(),
         };
-        let initial_listener =
-            ProxySupervisor::spawn_proxy_server(cfg.clone(), mock_handler.clone()).await;
+        // let initial_listener =
+        //     ProxySupervisor::spawn_proxy_server(cfg.clone(), mock_handler.clone()).await;
 
-        ProxySupervisor::new(initial_listener.clone(), mock_handler.clone());
+        let proxy_supervisor = ProxySupervisor::new(mock_handler.clone());
 
+        proxy_supervisor.load_listener(cfg.clone()).await;
         let address = format!("{}:{}", cfg.listen_host, cfg.listen_port);
         let client = spawn_real_tcp_client(&address).await;
 
