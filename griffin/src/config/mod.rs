@@ -7,7 +7,7 @@
 //! configuration using an [`ArcSwap`] container.
 //!
 pub mod config;
+pub mod controller;
 pub mod loader;
-pub mod manager;
 pub mod store;
 pub mod watcher;

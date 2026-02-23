@@ -36,3 +36,16 @@ hyper-util = { version = "0.1.17", features = [
 futures-util = { version = "0.3.31", features = ["std"] }
 prometheus = "0.14.0"
 scopeguard = "1.2.0"
+
+
+[profile.release]
+codegen-units = 1
+lto = true
+
+# [profile.dev]
+# codegen-units = 256
+# debug = 0
+# incremental = true
+[profile.dev]
+opt-level = 0
+debug = true

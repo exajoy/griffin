@@ -1,9 +1,9 @@
 use clap::Parser;
 use griffin::{
     args::args::Args,
-    config::{loader::ConfigLoader, manager::ConfigManager},
-    listener::manager::ListenerManager,
-    stream_handler::stream_handler::{RealStreamHandler, StreamHandler},
+    config::{controller::ConfigController, loader::ConfigLoader},
+    connection::proxy_connection_handler::ProxyConnectionHandler,
+    proxy::proxy_supervisor::ProxySupervisor,
 };
 use std::path::PathBuf;
 use tokio::sync::mpsc::unbounded_channel;
@@ -15,36 +15,42 @@ async fn main() -> Result<(), BoxError> {
     let config_path: PathBuf = args.config_path.into();
 
     // load initial config
-    let initial_cfg = ConfigLoader::from_file(&config_path)?;
-    let cfg_manager = ConfigManager::new(initial_cfg.clone());
+    let config = ConfigLoader::from_file(&config_path)?;
+    let config_controller = ConfigController::new(config.clone());
 
-    let proxy_handler = RealStreamHandler;
+    let pch = ProxyConnectionHandler;
     // start initial listener and listener manager
-    let initial_listener =
-        ListenerManager::start_listener(initial_cfg, proxy_handler.clone()).await;
-    let listener_manager = ListenerManager::new(initial_listener, proxy_handler);
+    let proxy_server = ProxySupervisor::spawn_proxy_server(config, pch.clone()).await;
+    // keep shutdown_tx alive using this variable
+    // or else it will be drop immediately
+    let _shutdown_tx = proxy_server.shutdown_tx.clone();
+    let proxy_supervisor = ProxySupervisor::new(proxy_server, pch);
 
     // a channel to notify listener reload on config changes
     let (reload_tx, mut reload_rx) = unbounded_channel::<()>();
 
     // start watching config file for changes
-    let _watcher = cfg_manager.watch_file(config_path, reload_tx);
+    // keep watcher alive using this variable
+    // or else it will be drop immediately
+    let _watcher = config_controller.watch_file(config_path, reload_tx);
 
     // Task that listens for config reload events
     let reload_task = {
-        // let cfg_manager = cfg_manager.clone();
-        // let listener_manager = listener_manager.clone();
-
         tokio::spawn(async move {
             while reload_rx.recv().await.is_some() {
-                let cfg = cfg_manager.get().as_ref().clone();
+                let config = config_controller.get().as_ref().clone();
                 println!("Config changed, reloading listener");
-                println!("New config:{:?}", cfg);
-                listener_manager.reload_listener(cfg).await;
+                println!("New config:{:?}", config);
+                proxy_supervisor.reload_listener(config).await;
             }
         })
     };
 
+    // println!(
+    //     "[shutdown] sender_count={} receiver_count={}",
+    //     shutdown_tx.sender_count(),
+    //     shutdown_tx.receiver_count(),
+    // );
     //  graceful shutdown (Ctrl-C)
     println!("Griffin Proxy started. Press Ctrl+C to shut down.");
 

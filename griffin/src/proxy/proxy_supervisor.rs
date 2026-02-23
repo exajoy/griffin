@@ -7,59 +7,20 @@ use tokio::sync::{Mutex, watch};
 use tokio::task::JoinHandle;
 
 use crate::config::config::Config;
-use crate::stream_handler::stream_handler::StreamHandler;
+use crate::connection::connection_handler::ConnectionHandler;
+use crate::proxy::proxy_instance::ProxyInstance;
 
-pub struct ListenerHandle {
-    /// running async task
-    /// which is a spawned accept loop
-    /// wrap with Arc allows to clone the handle
-
-    /// Design decidion:
-    /// 1.use `pub task: JoinHandle<()>`
-    /// this does not allod to work with ArcSwap
-    ///
-    ///
-    /// 2. use `pub task: Arc<JoinHandle<()>>`
-    /// to get value because cloning an Arc
-    /// does not move its inner value.
-    /// but we can’t consume something inside an Arc.
-    ///
-    /// in summary we can:
-    ///- check .is_finished()
-    ///- keep the task alive
-    ///- store it in a vector
-    ///
-    /// But we cannot:
-    ///- .await it
-    ///- get its result
-    ///- ensure you wait for it to finish
-    ///
-    ///
-    /// 3. wrap more with Mutex<Option<>>
-    /// lets us:
-    ///- get full ownership
-    ///- call .await
-    ///- get result
-    ///- guarantee complete flush
-    pub task: Arc<Mutex<Option<TaskWrapper>>>,
-
-    pub proxy_address: String,
-    /// shutdown signal sender
-    /// sending true tells the accept loop
-    /// to stop accepting new connections
-    pub shutdown_tx: watch::Sender<bool>,
-}
 /// manages hot-swapping listeners
-pub struct ListenerManager<H: StreamHandler + Clone> {
+pub struct ProxySupervisor<H: ConnectionHandler + Clone> {
     ///ArcSwap allows instant pointer swap with no locks.
-    pub current: arc_swap::ArcSwap<ListenerHandle>,
+    pub current: arc_swap::ArcSwap<ProxyInstance>,
     pub handler: H,
     pub draining: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
-impl<H: StreamHandler + Clone> ListenerManager<H> {
-    pub fn new(initial: Arc<ListenerHandle>, handler: H) -> Self {
-        ListenerManager {
+impl<H: ConnectionHandler + Clone> ProxySupervisor<H> {
+    pub fn new(initial: Arc<ProxyInstance>, handler: H) -> Self {
+        ProxySupervisor {
             current: arc_swap::ArcSwap::from(initial),
             handler,
             draining: Arc::new(Mutex::new(Vec::new())),
@@ -67,45 +28,61 @@ impl<H: StreamHandler + Clone> ListenerManager<H> {
     }
 
     /// Start a TCP accept loop
-    pub async fn start_listener(config: Config, handler: H) -> Arc<ListenerHandle> {
-        let proxy_address = format!("{}:{}", config.proxy_host, config.proxy_port);
-        let forward_authority = format!("{}:{}", config.forward_host, config.forward_port);
+    pub async fn spawn_proxy_server(config: Config, handler: H) -> Arc<ProxyInstance> {
+        let listen_address = format!("{}:{}", config.listen_host, config.listen_port);
+        let target_authority = format!("{}:{}", config.target_host, config.target_port);
 
-        let listener = TcpListener::bind(proxy_address.clone()).await.unwrap();
+        let listener = TcpListener::bind(listen_address.clone()).await.unwrap();
 
-        println!("[server: {}] start listening", proxy_address);
+        println!("[server: {}] start listening", listen_address);
 
         let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
         let metrics = Arc::new(Metrics::new());
-        let forward_authority = Authority::from_str(&forward_authority).unwrap();
+        let target_authority = Authority::from_str(&target_authority).unwrap();
 
-        let proxy_address_clone = proxy_address.clone();
+        let listen_address_clone = listen_address.clone();
+        // println!(
+        //     "[shutdown] sender_count={} receiver_count={}",
+        //     shutdown_tx.sender_count(),
+        //     shutdown_tx.receiver_count(),
+        // );
         let task = tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    _ = shutdown_rx.changed() => {
-                        println!("[server: {}] stop receiving requests", proxy_address);
-                        break;
+                    result = shutdown_rx.changed() => {
+                        match result {
+                            Ok(_) => {
+                                // println!("Shutdown signal received");
+                                println!("[server: {}] stop receiving requests", listen_address);
+                                break;
+                            }
+                            Err(err) => {
+                                println!("Shutdown sender dropped {}", err);
+                                break;
+                            }
+                        }
+                        // println!("[server: {}] stop receiving requests", listen_address);
+                        // break;
                     }
 
                     accept = listener.accept() => {
                         match accept {
                             Ok(( stream, _peer)) => {
                                 // println!("Accepted from {:?}", peer);
-                                handler.handle (stream, metrics.clone(), forward_authority.clone(), proxy_address.as_str());
+                                handler.handle (stream, metrics.clone(), target_authority.clone(), listen_address.as_str());
                             }
                             Err(e) => eprintln!("Accept error: {}", e),
                         }
                     }
                 }
             }
-            println!("[server: {}] is draining", proxy_address);
+            println!("[server: {}] is draining", listen_address);
         });
 
-        Arc::new(ListenerHandle {
+        Arc::new(ProxyInstance {
             task: Arc::new(Mutex::new(Some(task))),
             shutdown_tx,
-            proxy_address: proxy_address_clone,
+            listen_address: listen_address_clone,
         })
     }
 
@@ -122,12 +99,12 @@ impl<H: StreamHandler + Clone> ListenerManager<H> {
 
         let handler = self.handler.clone();
         //  bind new listener
-        let new = ListenerManager::start_listener(config, handler).await;
+        let new = ProxySupervisor::spawn_proxy_server(config, handler).await;
 
         // swap pointers
         let old = self.current.swap(new.clone());
 
-        let proxy_address = old.proxy_address.clone();
+        let listen_address = old.listen_address.clone();
         // get old task
         let old_task = old.task.lock().await.take().unwrap();
 
@@ -136,23 +113,19 @@ impl<H: StreamHandler + Clone> ListenerManager<H> {
         // avoids blocking the reload flow
         tokio::spawn(async move {
             match old_task.await {
-                Ok(_) => println!("[server: {}] drained", proxy_address),
+                Ok(_) => println!("[server: {}] drained", listen_address),
                 Err(e) => println!("Failed to drain old listener: {:?}", e),
             }
         });
     }
 }
 
-type TaskWrapper = JoinHandle<()>;
-// struct TaskWrapper(JoinHandle<()>);
-//
-// impl Drop for TaskWrapper {
-//     fn drop(&mut self) {
-//         eprintln!("⚠️ TaskWrapper DROPPED — task will be aborted!");
-//     }
-// }
+// pub type TaskWrapper = JoinHandle<()>;
+
 #[cfg(test)]
 mod tests {
+    use crate::connection::connection_handler::ConnectionHandler;
+
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpStream;
@@ -162,18 +135,18 @@ mod tests {
         pub notify: Arc<tokio::sync::Notify>,
     }
 
-    impl StreamHandler for MockStreamHandler {
+    impl ConnectionHandler for MockStreamHandler {
         fn handle(
             &self,
             mut stream: tokio::net::TcpStream,
             _metrics: Arc<Metrics>,
             _authority: Authority,
-            proxy_address: &str,
+            listen_address: &str,
         ) {
             let notify = self.notify.clone();
 
-            let proxy_address = proxy_address.to_string();
-            let backend_id = format!("server: {}", proxy_address);
+            let listen_address = listen_address.to_string();
+            let backend_id = format!("server: {}", listen_address);
             tokio::spawn(async move {
                 let mut buf = [0u8; 1024];
                 if let Ok(n) = stream.read(&mut buf).await {
@@ -242,10 +215,10 @@ mod tests {
         let port1 = get_free_port().await.unwrap();
         // start initial listener
         let cfg1 = Config {
-            proxy_host: "127.0.0.1".into(),
-            proxy_port: port1,
-            forward_host: "".into(),
-            forward_port: 0,
+            listen_host: "127.0.0.1".into(),
+            listen_port: port1,
+            target_host: "".into(),
+            target_port: 0,
             #[cfg(test)]
             message: "".into(),
         };
@@ -254,11 +227,11 @@ mod tests {
             notify: notify.clone(),
         };
         let initial_listener =
-            ListenerManager::start_listener(cfg1.clone(), mock_handler.clone()).await;
+            ProxySupervisor::spawn_proxy_server(cfg1.clone(), mock_handler.clone()).await;
 
-        let lister_manager = ListenerManager::new(initial_listener.clone(), mock_handler.clone());
+        let lister_manager = ProxySupervisor::new(initial_listener.clone(), mock_handler.clone());
 
-        let address_1 = format!("{}:{}", cfg1.proxy_host, cfg1.proxy_port);
+        let address_1 = format!("{}:{}", cfg1.listen_host, cfg1.listen_port);
         let client = spawn_real_tcp_client(&address_1).await;
 
         // wait for request to hit the port
@@ -267,10 +240,10 @@ mod tests {
         let port2 = get_free_port().await.unwrap();
         assert!(port2 != port1, "Ports should be different for this test");
         let cfg2 = Config {
-            proxy_host: "127.0.0.1".into(),
-            proxy_port: port2, // NEW PORT!
-            forward_host: "".into(),
-            forward_port: 0,
+            listen_host: "127.0.0.1".into(),
+            listen_port: port2, // NEW PORT!
+            target_host: "".into(),
+            target_port: 0,
             #[cfg(test)]
             message: "".into(),
         };
@@ -284,7 +257,7 @@ mod tests {
             "Old listener still accepted new connections!"
         );
 
-        let address_2 = format!("{}:{}", cfg2.proxy_host, cfg2.proxy_port);
+        let address_2 = format!("{}:{}", cfg2.listen_host, cfg2.listen_port);
         // new listener should accept new connections
         assert!(
             TcpStream::connect(address_2).await.is_ok(),
@@ -314,10 +287,10 @@ mod tests {
         let port = get_free_port().await.unwrap();
         // start initial listener
         let cfg1 = Config {
-            proxy_host: "127.0.0.1".into(),
-            proxy_port: port,
-            forward_host: "".into(),
-            forward_port: 0,
+            listen_host: "127.0.0.1".into(),
+            listen_port: port,
+            target_host: "".into(),
+            target_port: 0,
             #[cfg(test)]
             message: "".into(),
         };
@@ -326,21 +299,21 @@ mod tests {
             notify: notify.clone(),
         };
         let initial_listener =
-            ListenerManager::start_listener(cfg1.clone(), mock_handler.clone()).await;
+            ProxySupervisor::spawn_proxy_server(cfg1.clone(), mock_handler.clone()).await;
 
-        let lister_manager = ListenerManager::new(initial_listener.clone(), mock_handler.clone());
+        let lister_manager = ProxySupervisor::new(initial_listener.clone(), mock_handler.clone());
 
-        let address = format!("{}:{}", cfg1.proxy_host, cfg1.proxy_port);
+        let address = format!("{}:{}", cfg1.listen_host, cfg1.listen_port);
         let client = spawn_real_tcp_client(&address).await;
 
         // wait for request to hit the port
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         let cfg2 = Config {
-            proxy_host: "127.0.0.1".into(),
-            proxy_port: port, // SAME PORT!
-            forward_host: "".into(),
-            forward_port: 0,
+            listen_host: "127.0.0.1".into(),
+            listen_port: port, // SAME PORT!
+            target_host: "".into(),
+            target_port: 0,
             #[cfg(test)]
             message: "".into(),
         };
@@ -377,10 +350,10 @@ mod tests {
         let port = get_free_port().await.unwrap();
         // Start initial listener
         let cfg = Config {
-            proxy_host: "127.0.0.1".into(),
-            proxy_port: port,
-            forward_host: "127.0.0.1".into(),
-            forward_port: 1234,
+            listen_host: "127.0.0.1".into(),
+            listen_port: port,
+            target_host: "127.0.0.1".into(),
+            target_port: 1234,
             #[cfg(test)]
             message: "".into(),
         };
@@ -389,11 +362,11 @@ mod tests {
             notify: notify.clone(),
         };
         let initial_listener =
-            ListenerManager::start_listener(cfg.clone(), mock_handler.clone()).await;
+            ProxySupervisor::spawn_proxy_server(cfg.clone(), mock_handler.clone()).await;
 
-        ListenerManager::new(initial_listener.clone(), mock_handler.clone());
+        ProxySupervisor::new(initial_listener.clone(), mock_handler.clone());
 
-        let address = format!("{}:{}", cfg.proxy_host, cfg.proxy_port);
+        let address = format!("{}:{}", cfg.listen_host, cfg.listen_port);
         let client = spawn_real_tcp_client(&address).await;
 
         tokio::time::sleep(Duration::from_millis(100)).await;

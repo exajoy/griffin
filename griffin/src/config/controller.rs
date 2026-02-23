@@ -7,11 +7,11 @@ use super::{config::Config, loader::ConfigLoader, store::ConfigStore, watcher::C
 /// This config manager handles loading
 /// and storing configuration
 /// with hot-reload capability
-pub struct ConfigManager {
+pub struct ConfigController {
     store: ConfigStore,
 }
 
-impl ConfigManager {
+impl ConfigController {
     pub fn new(initial: Config) -> Self {
         Self {
             store: ConfigStore::new(initial),
@@ -45,7 +45,7 @@ impl ConfigManager {
                     return;
                 };
                 store.set(cfg);
-                //  notify ListenerManager
+                //  notify ListenerController
                 let _ = reload_tx.send(());
             }
         });
@@ -66,7 +66,7 @@ async fn test_hot_reload_on_file_change() {
     std::fs::write(&path, r#"{ "message": "v1" }"#).unwrap();
 
     // create manager and load v1
-    let manager = ConfigManager::new(Config::with_message("init".into()));
+    let manager = ConfigController::new(Config::with_message("init".into()));
     manager.load_from_file(&path).unwrap();
 
     // channel to receive reload notifications

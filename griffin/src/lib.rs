@@ -14,8 +14,8 @@ use tower::BoxError;
 
 pub mod args;
 pub mod config;
-pub mod listener;
-pub mod stream_handler;
+pub mod connection;
+pub mod proxy;
 
 pub async fn start_proxy(
     listener: TcpListener,
@@ -55,11 +55,8 @@ pub fn run_proxy(
 ) {
     // Placeholder for potential future implementation
     let io = TokioIo::new(stream);
-    let metrics = metrics.clone();
-    let forward_authority = forward_authority.clone();
     tokio::task::spawn(async move {
         let forward_authority = forward_authority.clone();
-        let metrics = metrics.clone();
         let svc = tower::service_fn(move |req| {
             let forward_authority = forward_authority.clone();
             let metrics = metrics.clone();

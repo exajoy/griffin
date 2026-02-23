@@ -6,10 +6,10 @@ pub struct Config {
     #[cfg(test)]
     pub message: String,
 
-    pub proxy_host: String,
-    pub proxy_port: u16,
-    pub forward_host: String,
-    pub forward_port: u16,
+    pub listen_host: String,
+    pub listen_port: u16,
+    pub target_host: String,
+    pub target_port: u16,
 }
 impl Config {
     #[cfg(test)]
@@ -26,10 +26,10 @@ impl Default for Config {
             #[cfg(test)]
             message: String::new(),
 
-            proxy_host: "127.0.0.1".into(),
-            proxy_port: 8080,
-            forward_host: "127.0.0.1".into(),
-            forward_port: 3000,
+            listen_host: "127.0.0.1".into(),
+            listen_port: 8080,
+            target_host: "127.0.0.1".into(),
+            target_port: 3000,
         }
     }
 }

@@ -36,7 +36,7 @@ Griffin’s binary is only 1 MB, which is:
 griffin -c config.yaml
 ```
 
-You can find example here [default_config.yaml](/griffin/default_config.yaml).
+You can find example config file here [default_config.yaml](/griffin/default_config.yaml).
 
 ### Requirements
 

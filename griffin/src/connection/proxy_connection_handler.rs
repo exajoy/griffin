@@ -8,20 +8,11 @@ use hyper_util::{
 };
 use std::sync::Arc;
 
-pub trait StreamHandler: Send + Sync + 'static {
-    fn handle(
-        &self,
-        stream: tokio::net::TcpStream,
-        metrics: Arc<Metrics>,
-        authority: Authority,
-        proxy_address: &str,
-    );
-}
-
+use crate::connection::connection_handler::ConnectionHandler;
 #[derive(Clone)]
-pub struct RealStreamHandler;
+pub struct ProxyConnectionHandler;
 
-impl StreamHandler for RealStreamHandler {
+impl ConnectionHandler for ProxyConnectionHandler {
     fn handle(
         &self,
         stream: tokio::net::TcpStream,

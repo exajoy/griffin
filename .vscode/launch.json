@@ -5,7 +5,7 @@
       "name": "Debug Rust",
       "type": "lldb",
       "request": "launch",
-      "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
+      "program": "${workspaceFolder}/target/debug/griffin",
       "args": [],
       "cwd": "${workspaceFolder}/griffin",
       "stopOnEntry": false,
